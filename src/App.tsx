@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { MessageSquare, Download, Save, FileText, Calculator, Building, CheckCircle, AlertCircle, Send, Plus } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { MessageSquare, Download, Save, FileText, Calculator, Building, CheckCircle, AlertCircle, Send, Plus, User } from 'lucide-react';
+import { PaywallModal } from './components/PaywallModal';
+import { SubscriptionCard } from './components/SubscriptionCard';
+import { PaymentSheet } from './components/PaymentSheet';
+import { SubscriptionStatus, QuestionCounter } from './components/SubscriptionStatus';
+import { SubscriptionManagement } from './components/SubscriptionManagement';
+import { EmptySubscriptionState } from './components/EmptySubscriptionState';
+import { Tooltip } from './components/Tooltip';
+import { useSubscription, useQuestionCount, usePlans } from './hooks/useSubscription';
+import { supabase } from './lib/supabase';
 
 interface ChatMessage {
   id: string;
@@ -35,7 +44,7 @@ const mockKtruCodes = [
 ];
 
 function App() {
-  const [currentView, setCurrentView] = useState<'planning' | 'chat' | 'results'>('planning');
+  const [currentView, setCurrentView] = useState<'planning' | 'chat' | 'results' | 'subscription' | 'account'>('planning');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [currentStep, setCurrentStep] = useState<'input' | 'codes' | 'characteristics' | 'ooz' | 'nmck' | 'complete'>('input');
@@ -54,6 +63,20 @@ function App() {
     { id: '2', name: 'Канцелярские товары', date: '2025-01-14', status: 'ready' },
   ]);
 
+  const [userId] = useState<string | null>('demo-user-id');
+  const [sessionId] = useState<string>(() => `session-${Date.now()}`);
+
+  const { subscription, isActive, refetch: refetchSubscription } = useSubscription(userId);
+  const { count, refetch: refetchQuestionCount } = useQuestionCount(userId, sessionId);
+  const { plans } = usePlans();
+
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
+  const [showManagement, setShowManagement] = useState(false);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+
+  const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[0];
+
   const addMessage = (type: 'user' | 'ai' | 'system', content: string, data?: any) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -65,7 +88,26 @@ function App() {
     setMessages(prev => [...prev, newMessage]);
   };
 
+  const trackQuestion = async (questionText: string, isFree: boolean) => {
+    try {
+      await supabase.from('user_questions').insert({
+        user_id: userId,
+        session_id: sessionId,
+        question_text: questionText,
+        is_free_question: isFree
+      });
+      refetchQuestionCount();
+    } catch (err) {
+      console.error('Failed to track question:', err);
+    }
+  };
+
   const startAIProcurement = () => {
+    if (!isActive && count.free_remaining <= 0) {
+      setCurrentView('subscription');
+      return;
+    }
+
     setCurrentView('chat');
     setMessages([]);
     setCurrentStep('input');
@@ -79,27 +121,37 @@ function App() {
         doc2: { status: 'ready', content: 'Проект контракта (типовой)' }
       }
     });
-    
+
     setTimeout(() => {
       addMessage('ai', 'Добро пожаловать в ИИ-помощник по подготовке закупок! Введите наименование или описание товара/услуги, которую необходимо закупить.');
       addMessage('system', 'Например: "бумага для офисной техники", "услуги охраны", "компьютерная техника"');
     }, 500);
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
+
+    if (!isActive && count.free_remaining <= 0) {
+      setShowPaywall(true);
+      return;
+    }
+
+    const isFreeQuestion = !isActive && count.free_remaining > 0;
+    await trackQuestion(inputValue, isFreeQuestion);
 
     addMessage('user', inputValue);
     const userInput = inputValue.toLowerCase();
     setInputValue('');
 
-    // Simulate AI processing
+    if (!isActive && count.free_remaining === 1) {
+      setTimeout(() => setShowPaywall(true), 2000);
+    }
+
     setTimeout(() => {
       if (currentStep === 'input') {
         setProcurementData(prev => ({ ...prev, productName: inputValue }));
-        
-        // Find matching codes
-        const matches = mockKtruCodes.filter(code => 
+
+        const matches = mockKtruCodes.filter(code =>
           userInput.includes('охран') ? code.name.includes('охран') :
           userInput.includes('анальг') || userInput.includes('таблет') || userInput.includes('лекарств') ? code.name.includes('нальгетики') :
           userInput.includes('банан') || userInput.includes('фрукт') ? code.name.includes('анан') :
@@ -110,8 +162,8 @@ function App() {
           addMessage('ai', 'По вашему запросу не найдено подходящих кодов КТРУ/ОКПД2. Попробуйте переформулировать запрос или уточнить категорию товара.');
           addMessage('system', 'Примеры корректных запросов: "канцелярские товары", "медицинские препараты", "строительные материалы"');
         } else if (matches.length === 1) {
-          setProcurementData(prev => ({ 
-            ...prev, 
+          setProcurementData(prev => ({
+            ...prev,
             ktruCode: matches[0].code,
             characteristics: { 'Основные характеристики': ['Стандартные'] }
           }));
@@ -121,8 +173,7 @@ function App() {
         } else {
           setCurrentStep('characteristics');
           addMessage('ai', `Найдено ${matches.length} подходящих кода. Уточните характеристики для точного определения:`);
-          
-          // Show characteristics questions
+
           const allCharacteristics: Record<string, Set<string>> = {};
           matches.forEach(match => {
             Object.entries(match.characteristics).forEach(([key, values]) => {
@@ -136,18 +187,17 @@ function App() {
               addMessage('system', `${key}: ${Array.from(valueSet).join(', ')}`);
             }
           });
-          
+
           addMessage('ai', 'Выберите подходящие характеристики, например: "охрана объектов, режим работы 24/7"');
         }
       } else if (currentStep === 'characteristics') {
-        // Process characteristics selection
-        const selectedCode = mockKtruCodes[0]; // Simulate selection
-        setProcurementData(prev => ({ 
-          ...prev, 
+        const selectedCode = mockKtruCodes[0];
+        setProcurementData(prev => ({
+          ...prev,
           ktruCode: selectedCode.code,
           characteristics: { 'Выбранные характеристики': ['Охрана объектов', '24/7'] }
         }));
-        
+
         addMessage('ai', `Определен код КТРУ: ${selectedCode.code} - ${selectedCode.name}`);
         setCurrentStep('ooz');
         setTimeout(() => generateOOZ(selectedCode), 1000);
@@ -177,7 +227,7 @@ function App() {
     addMessage('ai', 'Описание объекта закупки (ООЗ) сформировано автоматически.');
     addMessage('system', oozContent);
     setCurrentStep('nmck');
-    
+
     setTimeout(() => calculateNMCK(), 1500);
   };
 
@@ -199,7 +249,7 @@ function App() {
 
     addMessage('ai', `Начальная максимальная цена контракта (НМЦК) рассчитана: ${nmckData.amount.toLocaleString()} руб.`);
     addMessage('system', `Расчет по региону: ${nmckData.region}\nМетод: ${nmckData.method}`);
-    
+
     setCurrentStep('complete');
     setTimeout(() => {
       addMessage('ai', 'Пакет документов готов! Переходим к итоговому экрану.');
@@ -218,9 +268,57 @@ function App() {
     alert('Загрузка пакета документов...');
   };
 
+  const handleSubscribeClick = () => {
+    if (plans.length > 0) {
+      setSelectedPlanId(plans[0].id);
+      setShowPayment(true);
+    }
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      const plan = plans[0];
+      if (!plan || !userId) return;
+
+      const now = new Date();
+      const periodEnd = new Date(now);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+
+      const { data: subData, error: subError } = await supabase
+        .from('user_subscriptions')
+        .insert({
+          user_id: userId,
+          plan_id: plan.id,
+          status: 'active',
+          current_period_start: now.toISOString(),
+          current_period_end: periodEnd.toISOString(),
+          cancel_at_period_end: false
+        })
+        .select()
+        .single();
+
+      if (subError) throw subError;
+
+      await supabase.from('payment_history').insert({
+        user_id: userId,
+        subscription_id: subData.id,
+        amount_rub: plan.price_rub,
+        status: 'succeeded',
+        payment_method: 'card'
+      });
+
+      setShowPayment(false);
+      setShowPaywall(false);
+      refetchSubscription();
+      alert('Подписка успешно оформлена!');
+    } catch (err) {
+      console.error('Failed to create subscription:', err);
+      alert('Ошибка при оформлении подписки');
+    }
+  };
+
   const PlanningView = () => (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -233,25 +331,32 @@ function App() {
                 <div className="text-sm text-gray-500">Планирование закупки</div>
               </div>
             </div>
-            <button 
-              onClick={startAIProcurement}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Сделать закупку с ИИ</span>
-            </button>
+            <div className="flex items-center space-x-4">
+              <button
+                onClick={startAIProcurement}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Сделать закупку с ИИ</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('account')}
+                className="p-2 text-gray-600 hover:text-gray-900 rounded-lg hover:bg-gray-100 transition-colors"
+                aria-label="Аккаунт"
+              >
+                <User className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Планирование закупок</h2>
           <p className="text-gray-600">Управление процессом планирования и подготовки закупок</p>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm border">
             <div className="flex items-center justify-between">
@@ -282,7 +387,6 @@ function App() {
           </div>
         </div>
 
-        {/* Procurement List */}
         <div className="bg-white rounded-lg shadow-sm border">
           <div className="px-6 py-4 border-b">
             <div className="flex items-center justify-between">
@@ -310,8 +414,8 @@ function App() {
                     <td className="px-6 py-4 text-sm text-gray-500">{procurement.date}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                        procurement.status === 'ready' 
-                          ? 'bg-green-100 text-green-800' 
+                        procurement.status === 'ready'
+                          ? 'bg-green-100 text-green-800'
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
                         {procurement.status === 'ready' ? 'Готово' : 'Черновик'}
@@ -333,36 +437,34 @@ function App() {
 
   const ChatView = () => (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white shadow-sm border-b px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <button onClick={() => setCurrentView('planning')} className="text-gray-600 hover:text-gray-900">
-              ← Вернуться к планированию
+              ← Вернуться
             </button>
             <div className="flex items-center space-x-2">
               <MessageSquare className="w-5 h-5 text-blue-600" />
-              <h1 className="text-lg font-semibold text-gray-900">ИИ-помощник закупки</h1>
+              <h1 className="text-lg font-semibold text-gray-900">ИИ Эксперт</h1>
             </div>
           </div>
-          <div className="text-sm text-gray-500">
-            Шаг: {currentStep === 'input' ? 'Ввод товара' : 
-                   currentStep === 'codes' ? 'Поиск кодов' : 
-                   currentStep === 'characteristics' ? 'Уточнение характеристик' :
-                   currentStep === 'ooz' ? 'Формирование ООЗ' :
-                   currentStep === 'nmck' ? 'Расчет НМЦК' : 'Готово'}
+          <div className="flex items-center space-x-3">
+            {isActive ? (
+              <SubscriptionStatus subscription={subscription} onManage={() => setShowManagement(true)} />
+            ) : (
+              <QuestionCounter freeRemaining={count.free_remaining} />
+            )}
           </div>
         </div>
       </header>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
         <div className="max-w-4xl mx-auto space-y-6">
           {messages.map(message => (
             <div key={message.id} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-3xl rounded-lg px-4 py-3 ${
-                message.type === 'user' 
-                  ? 'bg-blue-600 text-white' 
+                message.type === 'user'
+                  ? 'bg-blue-600 text-white'
                   : message.type === 'system'
                   ? 'bg-gray-100 text-gray-700 border'
                   : 'bg-white text-gray-900 border shadow-sm'
@@ -379,7 +481,6 @@ function App() {
         </div>
       </div>
 
-      {/* Input */}
       <div className="border-t bg-white p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center space-x-4">
@@ -394,7 +495,7 @@ function App() {
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim()}
-              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Send className="w-5 h-5" />
             </button>
@@ -406,21 +507,20 @@ function App() {
 
   const ResultsView = () => (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b px-6 py-4">
-        <div className="flex items-center justify-between">
+      <header className="bg-white shadow-sm border-b px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
           <div className="flex items-center space-x-4">
             <button onClick={() => setCurrentView('chat')} className="text-gray-600 hover:text-gray-900">
               ← Вернуться к чату
             </button>
-            <h1 className="text-lg font-semibold text-gray-900">Результаты подготовки закупки</h1>
+            <h1 className="text-lg font-semibold text-gray-900">Результаты</h1>
           </div>
-          <div className="flex items-center space-x-3">
-            <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-green-700">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
+            <button onClick={handleSave} className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-green-700 transition-colors">
               <Save className="w-4 h-4" />
-              <span>Сохранить в планирование</span>
+              <span>Сохранить</span>
             </button>
-            <button onClick={handleDownloadAll} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700">
+            <button onClick={handleDownloadAll} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors">
               <Download className="w-4 h-4" />
               <span>Скачать всё</span>
             </button>
@@ -428,7 +528,6 @@ function App() {
         </div>
       </header>
 
-      {/* Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Пакет документов готов</h2>
@@ -439,35 +538,32 @@ function App() {
           )}
         </div>
 
-        {/* Document Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* ООЗ */}
           <div className="bg-white rounded-lg border shadow-sm">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <FileText className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">Описание объекта закупки (ООЗ)</h3>
+                  <h3 className="font-semibold text-gray-900">ООЗ</h3>
                 </div>
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   <span className="text-xs text-green-600 font-medium">Готово</span>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-4">Автоматически сформировано на основе кода КТРУ и характеристик</p>
+              <p className="text-sm text-gray-600 mb-4">Автоматически сформировано</p>
               <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
                 Скачать ООЗ
               </button>
             </div>
           </div>
 
-          {/* НМЦК */}
           <div className="bg-white rounded-lg border shadow-sm">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <Calculator className="w-5 h-5 text-green-600" />
-                  <h3 className="font-semibold text-gray-900">Расчет НМЦК</h3>
+                  <h3 className="font-semibold text-gray-900">НМЦК</h3>
                 </div>
                 <div className="flex items-center space-x-1">
                   <CheckCircle className="w-4 h-4 text-green-500" />
@@ -478,7 +574,7 @@ function App() {
                 {procurementData.nmck?.amount.toLocaleString()} ₽
               </p>
               <p className="text-xs text-gray-500 mb-4">
-                {procurementData.nmck?.method} | {procurementData.nmck?.region}
+                {procurementData.nmck?.method}
               </p>
               <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
                 Скачать расчет
@@ -486,7 +582,6 @@ function App() {
             </div>
           </div>
 
-          {/* Contract Draft */}
           <div className="bg-white rounded-lg border shadow-sm">
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -496,74 +591,160 @@ function App() {
                 </div>
                 <div className="flex items-center space-x-1">
                   <AlertCircle className="w-4 h-4 text-orange-500" />
-                  <span className="text-xs text-orange-600 font-medium">Заполните поля</span>
+                  <span className="text-xs text-orange-600 font-medium">Заполните</span>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-4">Частично заполнен. Требуется доработка в отдельном модуле</p>
+              <p className="text-sm text-gray-600 mb-4">Требуется доработка</p>
               <button className="w-full bg-orange-100 text-orange-700 py-2 px-4 rounded-lg hover:bg-orange-200 transition-colors">
                 Перейти к заполнению
               </button>
             </div>
           </div>
+        </div>
+      </main>
+    </div>
+  );
 
-          {/* Default Document 1 */}
-          <div className="bg-white rounded-lg border shadow-sm">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">Техническое задание</h3>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="text-xs text-green-600 font-medium">Готово</span>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">Типовое техническое задание</p>
-              <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
-                Скачать документ
+  const SubscriptionView = () => (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <button onClick={() => setCurrentView('planning')} className="text-gray-600 hover:text-gray-900">
+                ← Назад
               </button>
+              <h1 className="text-lg font-semibold text-gray-900">Подписка</h1>
             </div>
           </div>
+        </div>
+      </header>
 
-          {/* Default Document 2 */}
-          <div className="bg-white rounded-lg border shadow-sm">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                  <h3 className="font-semibold text-gray-900">Проект контракта (типовой)</h3>
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+        {isActive ? (
+          <div className="text-center py-12">
+            <CheckCircle className="w-16 h-16 text-green-600 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Подписка активна</h2>
+            <p className="text-gray-600 mb-6">Продление: {new Date(subscription!.current_period_end).toLocaleDateString('ru-RU')}</p>
+            <button
+              onClick={() => setShowManagement(true)}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Управление подпиской
+            </button>
+          </div>
+        ) : count.free_remaining > 0 ? (
+          <div>
+            <div className="text-center mb-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Выберите подписку</h2>
+              <p className="text-gray-600">Фиксированная цена, без ограничений</p>
+            </div>
+
+            <div className="flex justify-center">
+              {plans.length > 0 ? (
+                <div className="w-full max-w-md">
+                  <SubscriptionCard
+                    plan={plans[0]}
+                    onSelect={() => {
+                      setSelectedPlanId(plans[0].id);
+                      setShowPayment(true);
+                    }}
+                  />
                 </div>
-                <div className="flex items-center space-x-1">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="text-xs text-green-600 font-medium">Готово</span>
+              ) : (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">Загрузка планов...</p>
                 </div>
+              )}
+            </div>
+
+            <div className="mt-8 text-center">
+              <div className="inline-flex items-center space-x-2 text-sm text-gray-600">
+                <span>Без ограничений</span>
+                <Tooltip content="Фиксированная цена в месяц. Можно отменить в любой момент." />
               </div>
-              <p className="text-sm text-gray-600 mb-4">Базовый шаблон контракта</p>
-              <button className="w-full bg-gray-100 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-200 transition-colors">
-                Скачать документ
-              </button>
             </div>
           </div>
+        ) : (
+          <EmptySubscriptionState
+            onSubscribe={handleSubscribeClick}
+            onLearnMore={() => {}}
+          />
+        )}
+      </main>
+    </div>
+  );
 
-          {/* Summary Card */}
-          <div className="bg-blue-50 rounded-lg border border-blue-200">
-            <div className="p-6">
-              <div className="flex items-center space-x-3 mb-4">
-                <CheckCircle className="w-5 h-5 text-blue-600" />
-                <h3 className="font-semibold text-blue-900">Готово к сохранению</h3>
-              </div>
-              <div className="space-y-2 text-sm text-blue-800">
-                <div className="flex justify-between">
-                  <span>Готовых документов:</span>
-                  <span className="font-medium">4 из 5</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Требует доработки:</span>
-                  <span className="font-medium">1</span>
-                </div>
-              </div>
+  const AccountView = () => (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <button onClick={() => setCurrentView('planning')} className="text-gray-600 hover:text-gray-900">
+                ← Назад
+              </button>
+              <h1 className="text-lg font-semibold text-gray-900">Аккаунт</h1>
             </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Информация о подписке</h2>
+
+          {isActive ? (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-gray-600">Статус:</span>
+                <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
+                  Активна
+                </span>
+              </div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-gray-600">План:</span>
+                <span className="font-medium text-gray-900">{subscription?.plan?.name || 'Базовый'}</span>
+              </div>
+              <div className="flex items-center justify-between mb-6">
+                <span className="text-gray-600">Продление:</span>
+                <span className="font-medium text-gray-900">
+                  {new Date(subscription!.current_period_end).toLocaleDateString('ru-RU')}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowManagement(true)}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Управление подпиской
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-gray-600 mb-6">У вас нет активной подписки</p>
+              <button
+                onClick={() => setCurrentView('subscription')}
+                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Оформить подписку
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm border p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Использование</h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">Всего вопросов:</span>
+              <span className="font-medium text-gray-900">{count.total}</span>
+            </div>
+            {!isActive && (
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">Бесплатных осталось:</span>
+                <span className="font-medium text-gray-900">{count.free_remaining}</span>
+              </div>
+            )}
           </div>
         </div>
       </main>
@@ -575,6 +756,38 @@ function App() {
       {currentView === 'planning' && <PlanningView />}
       {currentView === 'chat' && <ChatView />}
       {currentView === 'results' && <ResultsView />}
+      {currentView === 'subscription' && <SubscriptionView />}
+      {currentView === 'account' && <AccountView />}
+
+      <PaywallModal
+        isOpen={showPaywall}
+        onClose={() => setShowPaywall(false)}
+        onSubscribe={() => {
+          setShowPaywall(false);
+          setCurrentView('subscription');
+        }}
+        freeQuestionsRemaining={count.free_remaining}
+        plan={plans[0] || null}
+      />
+
+      {selectedPlan && (
+        <PaymentSheet
+          isOpen={showPayment}
+          onClose={() => setShowPayment(false)}
+          plan={selectedPlan}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      <SubscriptionManagement
+        isOpen={showManagement}
+        onClose={() => setShowManagement(false)}
+        subscription={subscription}
+        onUpdate={() => {
+          refetchSubscription();
+          setShowManagement(false);
+        }}
+      />
     </div>
   );
 }

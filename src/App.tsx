@@ -32,13 +32,6 @@ function App() {
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[0];
 
-  useEffect(() => {
-    if (messages.length === 0) {
-      setTimeout(() => {
-        addMessage('ai', 'Это бета версия ИИ Эксперта по закону. Мы продолжаем улучшать систему - вы можете оценивать ответы с помощью лайков/дизлайков, чтобы помочь нам стать лучше.');
-      }, 300);
-    }
-  }, []);
 
   const addMessage = (type: 'user' | 'ai', content: string) => {
     const newMessage: ChatMessage = {
@@ -124,111 +117,230 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-900">ИИ Эксперт по закону</h1>
+    <div style={{ minHeight: '100vh', backgroundColor: '#F7F8F9', display: 'flex', flexDirection: 'column' }}>
+      {/* Header - точная копия */}
+      <header style={{
+        backgroundColor: '#fff',
+        padding: '12px 24px 16px',
+        borderBottom: '1px solid #DCDFE4',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <h1 style={{
+          fontFamily: 'Roboto, sans-serif',
+          fontSize: '24px',
+          fontWeight: 700,
+          lineHeight: '32px',
+          color: '#091e42',
+          margin: 0
+        }}>ИИ Эксперт по закону</h1>
 
-          <div className="flex items-center gap-4">
-            {/* Toggle Switch */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setIsShortAnswer(!isShortAnswer)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isShortAnswer ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isShortAnswer ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className="text-sm text-gray-700 flex items-center gap-1">
-                Краткий ответ
-                <HelpCircle className="w-4 h-4 text-blue-600" />
-              </span>
-            </div>
-
-            {/* History Button */}
-            <button className="flex items-center gap-2 px-4 py-2 border border-blue-600 text-blue-600 rounded hover:bg-blue-50 transition-colors">
-              <MessageCircle className="w-4 h-4" />
-              <span className="text-sm">История</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button
+              onClick={() => setIsShortAnswer(!isShortAnswer)}
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                height: '20px',
+                width: '36px',
+                alignItems: 'center',
+                borderRadius: '10px',
+                backgroundColor: isShortAnswer ? '#0c66e4' : '#8590A2',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+            >
+              <span style={{
+                display: 'inline-block',
+                height: '14px',
+                width: '14px',
+                transform: isShortAnswer ? 'translateX(19px)' : 'translateX(3px)',
+                borderRadius: '50%',
+                backgroundColor: '#fff',
+                transition: 'transform 0.2s'
+              }} />
             </button>
+            <span style={{
+              fontSize: '14px',
+              color: '#091e42',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontWeight: 400
+            }}>
+              Краткий ответ
+              <HelpCircle style={{ width: '16px', height: '16px', color: '#1d7afc' }} />
+            </span>
           </div>
+
+          {/* History Button */}
+          <button
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 16px',
+              border: '1px solid #0c66e4',
+              color: '#0c66e4',
+              borderRadius: '4px',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 500
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9f2ff'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <MessageCircle style={{ width: '20px', height: '20px' }} />
+            <span>История</span>
+          </button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Chat Messages */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="max-w-2xl w-full bg-blue-50 border border-blue-200 rounded-lg p-6 flex items-start gap-4">
-                  <MessageCircle className="w-8 h-8 text-blue-600 flex-shrink-0" />
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Привет, я Эксперт по закону</h3>
-                    <p className="text-sm text-gray-700">
-                      Это бета версия ИИ Эксперта по 44-ФЗ и 223-ФЗ. Мы продолжаем улучшать систему -
-                      вы можете оценивать ответы с помощью лайков/дизлайков, чтобы помочь нам стать лучше.
-                    </p>
-                  </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start',
+                  maxWidth: '80%',
+                  alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start'
+                }}
+              >
+                <div style={{
+                  backgroundColor: '#fff',
+                  borderRadius: '16px',
+                  padding: '8px 12px',
+                  fontFamily: 'Roboto, sans-serif',
+                  fontSize: '14px',
+                  fontWeight: 400,
+                  lineHeight: '20px',
+                  color: '#091e42'
+                }}>
+                  <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{message.content}</p>
+                  {message.type === 'ai' && (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      marginTop: '8px'
+                    }}>
+                      <button
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          borderRadius: '4px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F2F4'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <ThumbsUp style={{ width: '20px', height: '20px', color: '#44546f' }} />
+                      </button>
+                      <button
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          borderRadius: '4px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F2F4'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <ThumbsDown style={{ width: '20px', height: '20px', color: '#44546f' }} />
+                      </button>
+                      <button
+                        style={{
+                          padding: '4px',
+                          border: 'none',
+                          backgroundColor: 'transparent',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          borderRadius: '4px'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F1F2F4'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                      >
+                        <Copy style={{ width: '16px', height: '16px', color: '#44546f' }} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div
-                    className={`max-w-3xl rounded-2xl px-4 py-3 ${
-                      message.type === 'user'
-                        ? 'bg-white border border-gray-200 rounded-tr-sm'
-                        : 'bg-white border border-gray-200 rounded-tl-sm'
-                    }`}
-                  >
-                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{message.content}</p>
-                    {message.type === 'ai' && (
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                          <ThumbsUp className="w-5 h-5 text-gray-500" />
-                        </button>
-                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                          <ThumbsDown className="w-5 h-5 text-gray-500" />
-                        </button>
-                        <button className="p-1 hover:bg-gray-100 rounded transition-colors">
-                          <Copy className="w-4 h-4 text-gray-500" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))
-            )}
+            ))}
           </div>
         </div>
 
         {/* Input Area */}
-        <div className="border-t border-gray-200 bg-white p-6">
-          <div className="max-w-4xl mx-auto flex items-center gap-3">
+        <div style={{
+          borderTop: '1px solid #DCDFE4',
+          backgroundColor: '#fff',
+          padding: '16px 12px'
+        }}>
+          <div style={{
+            maxWidth: '800px',
+            margin: '0 auto',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
             <input
               type="text"
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
               placeholder="Как вам помочь?"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              style={{
+                flex: 1,
+                padding: '8px',
+                height: '36px',
+                border: '1px solid #8590A2',
+                borderRadius: '4px',
+                fontSize: '16px',
+                fontFamily: 'Roboto, sans-serif',
+                color: '#091e42',
+                outline: 'none'
+              }}
+              onFocus={(e) => e.target.style.borderColor = '#0c66e4'}
+              onBlur={(e) => e.target.style.borderColor = '#8590A2'}
             />
             <button
               onClick={handleSendMessage}
               disabled={!inputValue.trim()}
-              className="bg-blue-600 text-white p-3 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              style={{
+                backgroundColor: inputValue.trim() ? '#0c66e4' : '#F7F8F9',
+                color: inputValue.trim() ? '#fff' : '#758195',
+                padding: '8px',
+                height: '36px',
+                width: '36px',
+                borderRadius: '4px',
+                border: 'none',
+                cursor: inputValue.trim() ? 'pointer' : 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+              onMouseEnter={(e) => {
+                if (inputValue.trim()) e.currentTarget.style.backgroundColor = '#0055cc';
+              }}
+              onMouseLeave={(e) => {
+                if (inputValue.trim()) e.currentTarget.style.backgroundColor = '#0c66e4';
+              }}
             >
-              <Send className="w-5 h-5" />
+              <Send style={{ width: '20px', height: '20px' }} />
             </button>
           </div>
         </div>

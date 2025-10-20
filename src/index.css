@@ -1,3 +1,117 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    @apply border-gray-200;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 text-white font-medium px-6 py-3 rounded-xl;
+    @apply hover:bg-primary-700 active:bg-primary-800;
+    @apply transition-all duration-200 ease-out;
+    @apply shadow-soft hover:shadow-medium;
+    @apply focus:outline-none focus:ring-4 focus:ring-primary-200;
+    @apply disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none;
+  }
+
+  .btn-secondary {
+    @apply bg-gray-100 text-gray-700 font-medium px-6 py-3 rounded-xl;
+    @apply hover:bg-gray-200 active:bg-gray-300;
+    @apply transition-all duration-200 ease-out;
+    @apply focus:outline-none focus:ring-4 focus:ring-gray-200;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl border border-gray-200;
+    @apply shadow-soft hover:shadow-medium;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .card-elevated {
+    @apply bg-white rounded-2xl border-2 border-transparent;
+    @apply shadow-medium hover:shadow-strong;
+    @apply hover:border-primary-200;
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .input-field {
+    @apply w-full border-2 border-gray-200 rounded-xl px-4 py-3;
+    @apply focus:border-primary-500 focus:ring-4 focus:ring-primary-100 focus:outline-none;
+    @apply transition-all duration-200;
+    @apply placeholder:text-gray-400;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+    @apply transition-all duration-200;
+  }
+
+  .badge-primary {
+    @apply bg-primary-100 text-primary-700;
+  }
+
+  .badge-success {
+    @apply bg-success-100 text-success-700;
+  }
+
+  .badge-warning {
+    @apply bg-warning-100 text-warning-700;
+  }
+
+  .modal-overlay {
+    @apply fixed inset-0 bg-gray-900/60 backdrop-blur-sm;
+    @apply flex items-center justify-center z-50;
+    @apply animate-fade-in;
+  }
+
+  .modal-content {
+    @apply bg-white rounded-3xl shadow-strong;
+    @apply animate-scale-in;
+  }
+
+  .gradient-bg {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+
+  .shimmer-effect {
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .hover-lift {
+    @apply transition-transform duration-200;
+  }
+
+  .hover-lift:hover {
+    transform: translateY(-2px);
+  }
+
+  .tap-scale {
+    @apply transition-transform duration-150;
+  }
+
+  .tap-scale:active {
+    transform: scale(0.98);
+  }
+}

@@ -19,11 +19,25 @@ function App() {
   const [isShortAnswer, setIsShortAnswer] = useState(false);
 
   const [userId] = useState<string | null>('demo-user-id');
-  const [sessionId] = useState<string>(() => `session-${Date.now()}`);
+  const [sessionId] = useState<string>(() => {
+    const id = `session-${Date.now()}`;
+    console.log('🆔 Новая сессия:', id);
+    return id;
+  });
 
   const { subscription, isActive, refetch: refetchSubscription } = useSubscription(userId);
   const { count, refetch: refetchQuestionCount } = useQuestionCount(userId, sessionId);
   const { plans } = usePlans();
+
+  useEffect(() => {
+    console.log('📊 Текущий статус:', {
+      userId,
+      sessionId,
+      isActive,
+      count,
+      plans: plans.length
+    });
+  }, [count, isActive]);
 
   const [showPaywall, setShowPaywall] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -60,22 +74,36 @@ function App() {
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
+    console.log('🔍 Проверка лимита:', { isActive, free_remaining: count.free_remaining });
+
+    // Проверяем ДО отправки сообщения
     if (!isActive && count.free_remaining <= 0) {
+      console.log('❌ Лимит исчерпан, показываем paywall');
       setShowPaywall(true);
       return;
     }
 
     const userMessage = inputValue.trim();
+    const questionNumber = count.free_used + 1;
+    console.log(`📝 Отправка вопроса #${questionNumber}`);
+
     addMessage('user', userMessage);
     setInputValue('');
 
+    // Трекаем вопрос
     await trackQuestion(userMessage, !isActive);
 
+    // Показываем ответ AI
     setTimeout(() => {
       addMessage('ai', 'Похоже, ваш вопрос не связан с госзакупками или нормативные документы по нему отсутствуют в моей базе.');
     }, 1000);
 
-    if (!isActive && count.free_remaining - 1 <= 0) {
+    // Проверяем, был ли это последний бесплатный вопрос
+    const remainingAfter = count.free_remaining - 1;
+    console.log(`📊 После вопроса останется: ${remainingAfter}`);
+
+    if (!isActive && remainingAfter <= 0) {
+      console.log('⚠️ Это был последний бесплатный вопрос, показываем paywall через 2 сек');
       setTimeout(() => {
         setShowPaywall(true);
       }, 2000);

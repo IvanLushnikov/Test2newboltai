@@ -62,9 +62,12 @@ export function useQuestionCount(userId: string | null, sessionId: string | null
 
       if (userId) {
         query = query.eq('user_id', userId);
+        console.log('📊 Запрос вопросов для userId:', userId);
       } else if (sessionId) {
         query = query.eq('session_id', sessionId);
+        console.log('📊 Запрос вопросов для sessionId:', sessionId);
       } else {
+        console.log('⚠️ Нет ни userId, ни sessionId');
         setLoading(false);
         return;
       }
@@ -77,11 +80,14 @@ export function useQuestionCount(userId: string | null, sessionId: string | null
 
       if (freeError) throw freeError;
 
-      setCount({
+      const newCount = {
         total: total || 0,
         free_used: freeUsed || 0,
         free_remaining: Math.max(0, 2 - (freeUsed || 0))
-      });
+      };
+
+      console.log('✅ Счетчик обновлен:', newCount);
+      setCount(newCount);
     } catch (err) {
       console.error('Failed to fetch question count:', err);
     } finally {

@@ -10,6 +10,7 @@ import { Tooltip } from './components/Tooltip';
 import { useSubscription, useQuestionCount, usePlans } from './hooks/useSubscription';
 import { supabase } from './lib/supabase';
 
+
 interface ChatMessage {
   id: string;
   type: 'user' | 'ai' | 'system';

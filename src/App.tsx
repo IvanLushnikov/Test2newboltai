@@ -45,7 +45,7 @@ const mockKtruCodes = [
 ];
 
 function App() {
-  const [currentView, setCurrentView] = useState<'planning' | 'chat' | 'results' | 'subscription' | 'account'>('planning');
+  const [currentView, setCurrentView] = useState<'planning' | 'chat' | 'results' | 'subscription' | 'account'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [currentStep, setCurrentStep] = useState<'input' | 'codes' | 'characteristics' | 'ooz' | 'nmck' | 'complete'>('input');
@@ -77,6 +77,15 @@ function App() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
 
   const selectedPlan = plans.find(p => p.id === selectedPlanId) || plans[0];
+
+  useEffect(() => {
+    if (currentView === 'chat' && messages.length === 0) {
+      setTimeout(() => {
+        addMessage('ai', 'Привет, я Эксперт по закону! Это бета-версия ИИ Эксперта по 44-ФЗ и 223-ФЗ. Мы предоставляем изучающим систему закупок, ваш опыт с помощью наших ответов ИИ.');
+        addMessage('system', 'Можете задавать ответы по ведению закупок на основании 44-ФЗ, 223-ФЗ закона о контрактной системе. Вопрос по подписке?');
+      }, 300);
+    }
+  }, [currentView]);
 
   const addMessage = (type: 'user' | 'ai' | 'system', content: string, data?: any) => {
     const newMessage: ChatMessage = {

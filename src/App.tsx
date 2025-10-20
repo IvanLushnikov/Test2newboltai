@@ -137,6 +137,29 @@ function App() {
         }}>ИИ Эксперт по закону</h1>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          {/* Free Questions Counter - только если нет активной подписки */}
+          {!isActive && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 12px',
+              backgroundColor: count.free_remaining > 0 ? '#e9f2ff' : '#fff3cd',
+              borderRadius: '4px',
+              border: `1px solid ${count.free_remaining > 0 ? '#0c66e4' : '#ffc107'}`
+            }}>
+              <span style={{
+                fontSize: '14px',
+                color: '#091e42',
+                fontWeight: 500
+              }}>
+                {count.free_remaining > 0
+                  ? `Осталось ${count.free_remaining} бесплатных вопроса`
+                  : 'Бесплатные вопросы закончились'}
+              </span>
+            </div>
+          )}
+
           {/* Toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button

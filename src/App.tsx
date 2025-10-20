@@ -171,19 +171,26 @@ function App() {
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
-              padding: '6px 12px',
-              backgroundColor: count.free_remaining > 0 ? '#e9f2ff' : '#fff3cd',
-              borderRadius: '4px',
-              border: `1px solid ${count.free_remaining > 0 ? '#0c66e4' : '#ffc107'}`
+              padding: '8px 16px',
+              backgroundColor: count.free_remaining > 0 ? '#e9f2ff' : '#ffe5e5',
+              borderRadius: '6px',
+              border: `2px solid ${count.free_remaining > 0 ? '#0c66e4' : '#dc3545'}`
             }}>
+              <div style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: count.free_remaining > 0 ? '#0c66e4' : '#dc3545',
+                animation: count.free_remaining === 0 ? 'pulse 2s infinite' : 'none'
+              }} />
               <span style={{
                 fontSize: '14px',
                 color: '#091e42',
-                fontWeight: 500
+                fontWeight: 600
               }}>
                 {count.free_remaining > 0
-                  ? `Осталось ${count.free_remaining} бесплатных вопроса`
-                  : 'Бесплатные вопросы закончились'}
+                  ? `Осталось ${count.free_remaining} из 2 бесплатных вопросов`
+                  : '❌ Лимит исчерпан - нужна подписка'}
               </span>
             </div>
           )}

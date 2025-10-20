@@ -74,7 +74,7 @@ function App() {
   const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
-    console.log('🔍 Проверка лимита:', { isActive, free_remaining: count.free_remaining });
+    console.log('🔍 Проверка лимита:', { isActive, free_remaining: count.free_remaining, free_used: count.free_used });
 
     // Проверяем ДО отправки сообщения
     if (!isActive && count.free_remaining <= 0) {
@@ -84,8 +84,13 @@ function App() {
     }
 
     const userMessage = inputValue.trim();
-    const questionNumber = count.free_used + 1;
-    console.log(`📝 Отправка вопроса #${questionNumber}`);
+    const currentQuestionNumber = count.free_used + 1;
+    const willRemainingBeZero = count.free_remaining - 1 <= 0;
+
+    console.log(`📝 Отправка вопроса #${currentQuestionNumber}`, {
+      willRemainingBeZero,
+      currentRemaining: count.free_remaining
+    });
 
     addMessage('user', userMessage);
     setInputValue('');
@@ -98,13 +103,11 @@ function App() {
       addMessage('ai', 'Похоже, ваш вопрос не связан с госзакупками или нормативные документы по нему отсутствуют в моей базе.');
     }, 1000);
 
-    // Проверяем, был ли это последний бесплатный вопрос
-    const remainingAfter = count.free_remaining - 1;
-    console.log(`📊 После вопроса останется: ${remainingAfter}`);
-
-    if (!isActive && remainingAfter <= 0) {
-      console.log('⚠️ Это был последний бесплатный вопрос, показываем paywall через 2 сек');
+    // Если это был последний бесплатный вопрос - показываем paywall
+    if (!isActive && willRemainingBeZero) {
+      console.log('⚠️ Последний бесплатный вопрос исчерпан, показываем paywall через 2 сек');
       setTimeout(() => {
+        console.log('💳 Открываем PaywallModal');
         setShowPaywall(true);
       }, 2000);
     }

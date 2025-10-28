@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { HelpCircle, MessageCircle, ThumbsUp, ThumbsDown, Copy, Send } from 'lucide-react';
+import { HelpCircle, MessageCircle, ThumbsUp, ThumbsDown, Copy, Send, Sparkles } from 'lucide-react';
 import { PaywallModal } from './components/PaywallModal';
 import { PaymentSheet } from './components/PaymentSheet';
 import { SubscriptionManagement } from './components/SubscriptionManagement';
@@ -237,6 +237,29 @@ function App() {
               <HelpCircle style={{ width: '16px', height: '16px', color: '#1d7afc' }} />
             </span>
           </div>
+
+          {/* Test Paywall Button - для демонстрации */}
+          <button
+            onClick={() => setShowPaywall(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '6px 16px',
+              border: '2px solid #dc3545',
+              color: '#dc3545',
+              borderRadius: '4px',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              fontSize: '14px',
+              fontWeight: 600
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#ffe5e5'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+          >
+            <Sparkles style={{ width: '20px', height: '20px' }} />
+            <span>Показать Paywall</span>
+          </button>
 
           {/* History Button */}
           <button

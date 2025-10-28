@@ -258,7 +258,7 @@ function App() {
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
           >
             <Sparkles style={{ width: '20px', height: '20px' }} />
-            <span>Показать Paywall</span>
+            <span>Подписка</span>
           </button>
 
           {/* History Button */}
